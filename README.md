@@ -8,7 +8,7 @@ A privacy-first lottery dApp using **Fully Homomorphic Encryption (FHE)** where 
 
 ## Overview
 
-This protocol operates as a fully autonomous prediction game. Once deployed, the system runs continuously without human intervention. No admin or operator manually starts or ends rounds.
+This protocol operates as a semi-autonomous prediction game. Once deployed, the system runs continuously with minimal human intervention. No admin or operator manually starts or ends rounds.
 
 ### Key Features
 
