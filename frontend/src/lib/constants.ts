@@ -7,7 +7,7 @@ export const CONTRACT_ADDRESS = '0x4C80cf40A814C8D58fFF874E62A51fd2e677Ee4E';
 
 export const ENTRY_FEE = '0.001';
 
-export const MAX_GUESS = 1000;
+export const MAX_GUESS = 1023;
 export const MAX_CONFIDENCE = 100;
 
 export const WINNER_CATEGORIES = {

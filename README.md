@@ -22,11 +22,12 @@ This protocol operates as a fully autonomous prediction game. Once deployed, the
 
 ### Round Lifecycle
 
-1. **Round Start**: A new round begins with an encrypted random winning number (0-1000)
+1. **Round Start**: A new round begins with an encrypted random winning number (0-1023)
 2. **Entry Phase**: Participants submit encrypted guesses and confidence levels
-3. **Settlement**: When round ends or max participants reached, scores are computed under encryption
-4. **Reveal**: All encrypted values are decrypted and winners are determined
-5. **Next Round**: Immediately starts after settlement
+3. **Settlement Trigger**: When round timer expires, anyone can trigger settlement
+4. **Score Computation**: Scores computed in batches using FHE operations (encrypted comparisons)
+5. **Winner Reveal**: Only winner indices and their data are decrypted and verified
+6. **Prize Distribution**: Winners paid, new round starts automatically
 
 ### Winner Categories
 
@@ -36,28 +37,36 @@ Each round produces exactly three distinct winners:
 |----------|-------------|-------------|
 | **Conviction Weighted** | Best combination of closeness and confidence | 50% |
 | **Raw Accuracy** | Closest guess, ignoring confidence | 30% |
-| **Best Calibration** | Confidence most closely matched actual accuracy | 19% |
+| **Best Calibration** | Confidence most closely matched actual accuracy | 20% |
 
 ### Scoring Logic
 
-All scoring happens under encryption:
+All scoring happens under encryption using FHE operations:
 
-- **Distance**: `|guess - winningNumber|`
+- **Distance**: `|guess - winningNumber|` computed via `FHE.gte()` + `FHE.select()` + `FHE.sub()`
 - **Raw Score**: `MAX_GUESS - distance` (higher is better)
-- **Conviction Score**: `rawScore × confidence`
-- **Calibration Error**: `|confidence - (rawScore × 100 / MAX_GUESS)|`
+- **Conviction Score**: `rawScore × confidence` computed via `FHE.mul()`
+- **Calibration Error**: `|confidence - normalizedAccuracy|` computed under encryption
+
+Winner selection uses encrypted comparisons:
+- `FHE.gt()` to find highest conviction score
+- `FHE.lt()` to find lowest distance (best accuracy)
+- `FHE.lt()` to find lowest calibration error
 
 ## Technical Architecture
 
 ### Smart Contract
 
-The `PrivateLottery.sol` contract uses Zama's FHEVM for:
+The `PrivLottery.sol` contract uses Zama's FHEVM for:
 
-- Encrypted winning number generation (`FHE.randEuint32()`)
+- Encrypted winning number generation (`FHE.randEuint16()` masked to 10 bits)
 - Encrypted input validation (`FHE.fromExternal()`)
-- Encrypted score computation (`FHE.add()`, `FHE.sub()`, `FHE.mul()`)
-- Encrypted comparisons (`FHE.lt()`, `FHE.gte()`)
+- Encrypted distance computation (`FHE.sub()` + `FHE.select()`)
+- Encrypted score computation (`FHE.mul()`, `FHE.div()`)
+- Encrypted winner selection (`FHE.lt()`, `FHE.gt()`, `FHE.select()`)
+- Batch score processing for gas efficiency
 - Public decryption for reveal (`FHE.makePubliclyDecryptable()`)
+- Signature verification (`FHE.checkSignatures()`)
 
 ### Parameters
 
@@ -67,7 +76,7 @@ The `PrivateLottery.sol` contract uses Zama's FHEVM for:
 | Round Duration | 1 hour |
 | Max Participants | 100 |
 | Min Participants | 3 |
-| Guess Range | 0 - 1000 |
+| Guess Range | 0 - 1023 |
 | Confidence Range | 0 - 100% |
 | Platform Fee | 1% |
 
@@ -203,7 +212,7 @@ This project is configured for **Sepolia Ethereum Testnet**.
 
 1. Connect your MetaMask wallet
 2. Ensure you're on Sepolia network
-3. Select your guess (0-1000)
+3. Select your guess (0-1023)
 4. Set your confidence level (0-100%)
 5. Submit with 0.001 ETH entry fee
 6. Your guess is encrypted locally before submission

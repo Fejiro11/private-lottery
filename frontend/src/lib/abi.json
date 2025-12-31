@@ -22,12 +22,12 @@
   },
   {
     "inputs": [],
-    "name": "InvalidKMSSignatures",
+    "name": "InvalidBatch",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "InvalidRevealCount",
+    "name": "InvalidProof",
     "type": "error"
   },
   {
@@ -57,38 +57,17 @@
   },
   {
     "inputs": [],
-    "name": "RoundNotRevealing",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "RoundNotSettling",
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "handle",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      }
-    ],
-    "name": "SenderNotAllowedToUseHandle",
+    "inputs": [],
+    "name": "ScoresNotComputed",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "TransferFailed",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ZamaProtocolUnsupported",
     "type": "error"
   },
   {
@@ -120,25 +99,6 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
-        "internalType": "bytes32[]",
-        "name": "handlesList",
-        "type": "bytes32[]"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes",
-        "name": "abiEncodedCleartexts",
-        "type": "bytes"
-      }
-    ],
-    "name": "PublicDecryptionVerified",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
         "indexed": true,
         "internalType": "uint256",
         "name": "roundId",
@@ -162,19 +122,6 @@
         "internalType": "uint256",
         "name": "roundId",
         "type": "uint256"
-      }
-    ],
-    "name": "RoundCompleted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "roundId",
-        "type": "uint256"
       },
       {
         "indexed": false,
@@ -183,7 +130,7 @@
         "type": "uint32"
       }
     ],
-    "name": "RoundRevealed",
+    "name": "RoundCompleted",
     "type": "event"
   },
   {
@@ -235,7 +182,32 @@
       },
       {
         "indexed": false,
-        "internalType": "enum PrivLottery.WinnerCategory",
+        "internalType": "uint256",
+        "name": "batchStart",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "batchEnd",
+        "type": "uint256"
+      }
+    ],
+    "name": "ScoresComputed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
         "name": "category",
         "type": "uint8"
       },
@@ -393,16 +365,21 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "confidentialProtocolId",
-    "outputs": [
+    "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "batchStart",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "batchSize",
         "type": "uint256"
       }
     ],
-    "stateMutability": "view",
+    "name": "computeScoresBatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -424,6 +401,36 @@
         "internalType": "uint32",
         "name": "winningNumber",
         "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "convictionWinnerIdx",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "accuracyWinnerIdx",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "calibrationWinnerIdx",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32[3]",
+        "name": "winnerGuesses",
+        "type": "uint32[3]"
+      },
+      {
+        "internalType": "uint32[3]",
+        "name": "winnerConfidences",
+        "type": "uint32[3]"
+      },
+      {
+        "internalType": "uint32[3]",
+        "name": "winnerDistances",
+        "type": "uint32[3]"
       },
       {
         "internalType": "bytes",
@@ -456,7 +463,7 @@
         "type": "uint256"
       },
       {
-        "internalType": "enum PrivLottery.RoundStatus",
+        "internalType": "uint8",
         "name": "status",
         "type": "uint8"
       },
@@ -468,6 +475,11 @@
       {
         "internalType": "uint256",
         "name": "participantCount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "scoresComputedCount",
         "type": "uint256"
       }
     ],
@@ -500,19 +512,28 @@
         "type": "uint256"
       },
       {
-        "internalType": "uint32",
-        "name": "revealedGuess",
-        "type": "uint32"
-      },
-      {
-        "internalType": "uint32",
-        "name": "revealedConfidence",
-        "type": "uint32"
-      },
-      {
         "internalType": "bool",
-        "name": "isRevealed",
+        "name": "scoresComputed",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "roundId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRevealedWinningNumber",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
       }
     ],
     "stateMutability": "view",
@@ -536,7 +557,7 @@
             "type": "address"
           },
           {
-            "internalType": "enum PrivLottery.WinnerCategory",
+            "internalType": "uint8",
             "name": "category",
             "type": "uint8"
           },
@@ -556,9 +577,14 @@
             "type": "uint32"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint32",
+            "name": "distance",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
             "name": "score",
-            "type": "uint256"
+            "type": "uint32"
           }
         ],
         "internalType": "struct PrivLottery.Winner[3]",
@@ -594,73 +620,8 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "participants",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "addr",
-        "type": "address"
-      },
-      {
-        "internalType": "euint32",
-        "name": "encryptedGuess",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "euint32",
-        "name": "encryptedConfidence",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "uint256",
-        "name": "submittedAt",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint32",
-        "name": "revealedGuess",
-        "type": "uint32"
-      },
-      {
-        "internalType": "uint32",
-        "name": "revealedConfidence",
-        "type": "uint32"
-      },
-      {
-        "internalType": "bool",
-        "name": "isRevealed",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint32[]",
-        "name": "participantReveals",
-        "type": "uint32[]"
-      },
-      {
-        "internalType": "bytes",
-        "name": "batchProof",
-        "type": "bytes"
-      }
-    ],
-    "name": "processWinners",
+    "inputs": [],
+    "name": "requestWinnerReveal",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -691,12 +652,12 @@
         "type": "uint256"
       },
       {
-        "internalType": "enum PrivLottery.RoundStatus",
+        "internalType": "uint8",
         "name": "status",
         "type": "uint8"
       },
       {
-        "internalType": "euint32",
+        "internalType": "bytes32",
         "name": "encryptedWinningNumber",
         "type": "bytes32"
       },
@@ -713,6 +674,11 @@
       {
         "internalType": "uint256",
         "name": "participantCount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "scoresComputedCount",
         "type": "uint256"
       },
       {
@@ -734,12 +700,12 @@
   {
     "inputs": [
       {
-        "internalType": "externalEuint32",
+        "internalType": "bytes32",
         "name": "encryptedGuess",
         "type": "bytes32"
       },
       {
-        "internalType": "externalEuint32",
+        "internalType": "bytes32",
         "name": "encryptedConfidence",
         "type": "bytes32"
       },

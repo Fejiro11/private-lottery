@@ -4,6 +4,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { SEPOLIA_CHAIN_ID } from '@/lib/constants';
 
+// Type guard for ethereum provider
+declare const window: Window & {
+  ethereum?: {
+    isMetaMask?: boolean;
+    request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+    on: (event: string, callback: (...args: unknown[]) => void) => void;
+    removeListener: (event: string, callback: (...args: unknown[]) => void) => void;
+  };
+};
+
 interface WalletState {
   address: string | null;
   isConnected: boolean;
@@ -130,8 +140,8 @@ export function useWallet() {
       window.ethereum.on('chainChanged', () => window.location.reload());
 
       return () => {
-        window.ethereum.removeListener('accountsChanged', checkConnection);
-        window.ethereum.removeListener('chainChanged', () => {});
+        window.ethereum?.removeListener('accountsChanged', checkConnection);
+        window.ethereum?.removeListener('chainChanged', () => {});
       };
     }
   }, [checkConnection]);

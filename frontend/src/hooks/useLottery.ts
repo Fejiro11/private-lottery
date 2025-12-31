@@ -4,31 +4,40 @@ import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, ENTRY_FEE } from '@/lib/constants';
 
+// RoundStatus enum matching contract
+export enum RoundStatus {
+  Active = 0,
+  Settling = 1,
+  Completed = 2,
+  Cancelled = 3
+}
+
 export interface RoundData {
   roundId: bigint;
   startTime: bigint;
   endTime: bigint;
   prizePool: bigint;
   participantCount: bigint;
-  status: number;
+  scoresComputedCount: bigint;
+  status: RoundStatus;
 }
 
-export interface RevealedEntry {
-  player: string;
+export interface WinnerData {
+  addr: string;
+  category: number;
+  prize: bigint;
   guess: number;
   confidence: number;
   distance: number;
-  convictionScore: bigint;
-  calibrationError: bigint;
+  score: number;
 }
 
-export interface Winners {
-  winner1: string;
-  winner2: string;
-  winner3: string;
-  payout1: bigint;
-  payout2: bigint;
-  payout3: bigint;
+export interface PastRound {
+  roundId: bigint;
+  winningNumber: number;
+  winners: WinnerData[];
+  prizePool: bigint;
+  participantCount: bigint;
 }
 
 export function useLottery(signer: ethers.Signer | null) {
@@ -38,6 +47,7 @@ export function useLottery(signer: ethers.Signer | null) {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pastRounds, setPastRounds] = useState<PastRound[]>([]);
 
   useEffect(() => {
     if (signer && CONTRACT_ADDRESS) {
@@ -57,7 +67,8 @@ export function useLottery(signer: ethers.Signer | null) {
         endTime: round.endTime,
         prizePool: round.prizePool,
         participantCount: round.participantCount,
-        status: Number(round.status),
+        scoresComputedCount: round.scoresComputedCount,
+        status: Number(round.status) as RoundStatus,
       });
 
       // Calculate time remaining from endTime
@@ -150,49 +161,89 @@ export function useLottery(signer: ethers.Signer | null) {
     }
   }, [contract, fetchRoundData]);
 
-  const getWinners = useCallback(async (roundId: bigint): Promise<Winners | null> => {
+  const computeScoresBatch = useCallback(async (batchStart: number, batchSize: number) => {
+    if (!contract) return false;
+
+    setIsLoading(true);
+    try {
+      const tx = await contract.computeScoresBatch(batchStart, batchSize);
+      await tx.wait();
+      await fetchRoundData();
+      return true;
+    } catch (err: any) {
+      console.error('Error computing scores:', err);
+      setError(err.reason || err.message);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [contract, fetchRoundData]);
+
+  const getWinners = useCallback(async (roundId: bigint): Promise<WinnerData[] | null> => {
     if (!contract) return null;
 
     try {
       const winners = await contract.getRoundWinners(roundId);
-      return {
-        winner1: winners.winner1,
-        winner2: winners.winner2,
-        winner3: winners.winner3,
-        payout1: winners.payout1,
-        payout2: winners.payout2,
-        payout3: winners.payout3,
-      };
+      return winners.map((w: any) => ({
+        addr: w.addr,
+        category: Number(w.category),
+        prize: w.prize,
+        guess: Number(w.guess),
+        confidence: Number(w.confidence),
+        distance: Number(w.distance),
+        score: Number(w.score),
+      }));
     } catch (err: any) {
       console.error('Error getting winners:', err);
       return null;
     }
   }, [contract]);
 
-  const getRevealedEntries = useCallback(async (roundId: bigint): Promise<RevealedEntry[]> => {
-    if (!contract) return [];
+  const fetchPastRounds = useCallback(async (count: number = 5) => {
+    if (!contract) return;
 
     try {
-      const entries = await contract.getRevealedEntries(roundId);
-      return entries.map((e: any) => ({
-        player: e.player,
-        guess: Number(e.guess),
-        confidence: Number(e.confidence),
-        distance: Number(e.distance),
-        convictionScore: e.convictionScore,
-        calibrationError: e.calibrationError,
-      }));
+      const currentId = await contract.currentRoundId();
+      const rounds: PastRound[] = [];
+      
+      for (let i = Number(currentId) - 1; i >= 1 && rounds.length < count; i--) {
+        try {
+          const roundData = await contract.rounds(i);
+          if (roundData.isSettled) {
+            const winners = await contract.getRoundWinners(i);
+            rounds.push({
+              roundId: BigInt(i),
+              winningNumber: Number(roundData.revealedWinningNumber),
+              winners: winners.map((w: any) => ({
+                addr: w.addr,
+                category: Number(w.category),
+                prize: w.prize,
+                guess: Number(w.guess),
+                confidence: Number(w.confidence),
+                distance: Number(w.distance),
+                score: Number(w.score),
+              })),
+              prizePool: roundData.prizePool,
+              participantCount: roundData.participantCount,
+            });
+          }
+        } catch {
+          // Skip rounds that fail to load
+        }
+      }
+      
+      setPastRounds(rounds);
     } catch (err: any) {
-      console.error('Error getting revealed entries:', err);
-      return [];
+      console.error('Error fetching past rounds:', err);
     }
   }, [contract]);
 
   useEffect(() => {
     fetchRoundData();
+    fetchPastRounds();
     const interval = setInterval(fetchRoundData, 10000);
     return () => clearInterval(interval);
-  }, [fetchRoundData]);
+  }, [fetchRoundData, fetchPastRounds]);
 
   useEffect(() => {
     if (timeRemaining <= 0) return;
@@ -211,12 +262,14 @@ export function useLottery(signer: ethers.Signer | null) {
     timeRemaining,
     isLoading,
     error,
+    pastRounds,
     submitEntry,
     settleRound,
     cancelRound,
+    computeScoresBatch,
     checkEntry,
     fetchRoundData,
     getWinners,
-    getRevealedEntries,
+    fetchPastRounds,
   };
 }

@@ -5,8 +5,9 @@ import { Header } from '@/components/Header';
 import { RoundInfo } from '@/components/RoundInfo';
 import { EntryForm } from '@/components/EntryForm';
 import { WinnerCategories } from '@/components/WinnerCategories';
+import { RevealPanel } from '@/components/RevealPanel';
 import { useWallet } from '@/hooks/useWallet';
-import { useLottery } from '@/hooks/useLottery';
+import { useLottery, RoundStatus } from '@/hooks/useLottery';
 import { initializeFhevm, encryptPrediction } from '@/lib/fhevm';
 import { CONTRACT_ADDRESS } from '@/lib/constants';
 import { HelpCircle, Shield, Zap, Eye } from 'lucide-react';
@@ -39,8 +40,8 @@ export default function Home() {
     const round = lottery.currentRound;
     if (!round || !wallet.signer || isAutoSettling) return;
 
-    // Check if round has ended (status=0 Active, time expired)
-    const isEnded = round.status === 0 && lottery.timeRemaining <= 0;
+    // Check if round has ended (status=Active, time expired)
+    const isEnded = round.status === RoundStatus.Active && lottery.timeRemaining <= 0;
     if (!isEnded) return;
 
     const participantCount = Number(round.participantCount);
@@ -51,7 +52,7 @@ export default function Home() {
       setIsAutoSettling(true);
       lottery.settleRound()
         .then((success) => {
-          if (success) console.log('Round settled successfully');
+          if (success) console.log('Round settled, entering scoring phase');
         })
         .finally(() => setIsAutoSettling(false));
     } else if (participantCount < 3) {
@@ -157,6 +158,7 @@ export default function Home() {
               timeRemaining={lottery.timeRemaining}
               onSettleRound={lottery.settleRound}
               onCancelRound={lottery.cancelRound}
+              onComputeScores={lottery.computeScoresBatch}
               isSettling={isAutoSettling || lottery.isLoading}
             />
 
@@ -223,6 +225,14 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Past Rounds Reveal Section */}
+        <div className="mt-8">
+          <RevealPanel 
+            pastRounds={lottery.pastRounds} 
+            isLoading={lottery.isLoading} 
+          />
         </div>
 
         {/* Error Display */}
