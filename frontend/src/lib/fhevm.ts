@@ -1,11 +1,17 @@
 'use client';
 
 import { BrowserProvider } from 'ethers';
+import { initFhevm, createInstance, type FhevmInstance } from 'fhevmjs';
 
-// Dynamic import to handle SSR
-let fhevmModule: typeof import('@zama-fhe/relayer-sdk') | null = null;
-let fhevmInstance: any = null;
+let fhevmInstance: FhevmInstance | null = null;
 let isInitialized = false;
+
+// FHEVM Configuration for Sepolia
+const FHEVM_CONFIG = {
+  kmsContractAddress: '0xbE0E383937d564D7FF0BC3b46c51f0bF8d5C311A',
+  aclContractAddress: '0xf0Ffdc93b7E186bC2f8CB3dAA75D86d1930A433D',
+  gatewayUrl: 'https://gateway.testnet.zama.org',
+};
 
 /**
  * Convert Uint8Array to hex string
@@ -17,7 +23,7 @@ function toHexString(bytes: Uint8Array): string {
 }
 
 /**
- * Initialize the FHEVM SDK
+ * Initialize the FHEVM library
  * Must be called once before using encryption features
  */
 export async function initializeFhevm(): Promise<void> {
@@ -25,12 +31,11 @@ export async function initializeFhevm(): Promise<void> {
   if (typeof window === 'undefined') return; // Skip on SSR
 
   try {
-    // Dynamic import to avoid SSR issues
-    fhevmModule = await import('@zama-fhe/relayer-sdk');
+    await initFhevm();
     isInitialized = true;
-    console.log('FHEVM SDK loaded successfully');
+    console.log('FHEVM initialized successfully');
   } catch (error) {
-    console.error('Failed to load FHEVM SDK:', error);
+    console.error('Failed to initialize FHEVM:', error);
     throw error;
   }
 }
@@ -38,28 +43,18 @@ export async function initializeFhevm(): Promise<void> {
 /**
  * Get or create an FHEVM instance for the current provider
  */
-export async function getFhevmInstance(provider: BrowserProvider): Promise<any> {
-  if (!isInitialized || !fhevmModule) {
+export async function getFhevmInstance(provider: BrowserProvider): Promise<FhevmInstance> {
+  if (!isInitialized) {
     await initializeFhevm();
-  }
-
-  if (!fhevmModule) {
-    throw new Error('FHEVM SDK not loaded');
   }
 
   if (!fhevmInstance) {
     const network = await provider.getNetwork();
-    
-    // Use Sepolia configuration
-    const config = {
+    fhevmInstance = await createInstance({
       chainId: Number(network.chainId),
-      networkUrl: 'https://rpc.sepolia.org',
-      kmsContractAddress: '0xbE0E383937d564D7FF0BC3b46c51f0bF8d5C311A' as `0x${string}`,
-      aclContractAddress: '0xf0Ffdc93b7E186bC2f8CB3dAA75D86d1930A433D' as `0x${string}`,
-      gatewayUrl: 'https://gateway.testnet.zama.org',
-    };
-    
-    fhevmInstance = await fhevmModule.createInstance(config);
+      networkUrl: (provider as any).connection?.url || 'https://rpc.sepolia.org',
+      ...FHEVM_CONFIG,
+    });
     console.log('FHEVM instance created');
   }
 
@@ -85,19 +80,16 @@ export async function encryptPrediction(
   const instance = await getFhevmInstance(provider);
 
   // Create encrypted input bound to contract and user
-  const input = instance.createEncryptedInput(
-    contractAddress as `0x${string}`,
-    userAddress as `0x${string}`
-  );
+  const input = instance.createEncryptedInput(contractAddress, userAddress);
   
-  // Add both values to the encrypted input (32-bit integers)
+  // Add both values to the encrypted input
   input.add32(guess);
   input.add32(confidence);
   
   // Encrypt and get handles + proof
   const encrypted = await input.encrypt();
 
-  // Convert Uint8Array handles to hex strings for contract calls
+  // Convert to hex strings for contract calls
   return {
     encryptedGuess: toHexString(encrypted.handles[0]),
     encryptedConfidence: toHexString(encrypted.handles[1]),
@@ -111,3 +103,5 @@ export async function encryptPrediction(
 export function resetFhevmInstance(): void {
   fhevmInstance = null;
 }
+
+export { type FhevmInstance };
